@@ -17,7 +17,7 @@ def eye_aspect_ratio(eye):
 	return ear
 
 ap = argparse.ArgumentParser()
-ap.add_argument("-p", "--shape-predictor", default="shape_predictor_68_face_landmarks.dat",
+ap.add_argument("-p", "--shape-predictor", default="shape_predictor.dat",
 	help="path to facial landmark predictor")
 ap.add_argument("-t", "--threshold", type=float, default=0.2,
 	help="threshold to determine closed eyes")
@@ -33,16 +33,19 @@ TOTAL = 0
 
 print("[INFO] loading facial landmark predictor...")
 detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor(args["shape_predictor"])
+predictor = dlib.shape_predictor("shape_predictor.dat")
 
 (lStart, lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
 (rStart, rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
 
+font = cv2.FONT_HERSHEY_SIMPLEX
 cap = cv2.VideoCapture(0)
 while cap.isOpened():
 	ret, frame = cap.read()
-	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+	width, height = frame.shape[:2]
+	whalf, hhalf = int(width/2), int(height/2)
 
+	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 	rects = detector(gray, 0)
 
 	for rect in rects:
@@ -56,26 +59,28 @@ while cap.isOpened():
 
 		ear = (leftEAR + rightEAR) / 2.0
 
-		cv2.drawContours(frame, [cv2.convexHull(leftEye)], -1, (0, 255, 0), 1)
-		cv2.drawContours(frame, [cv2.convexHull(rightEye)], -1, (0, 255, 0), 1)
-
+		cv2.drawContours(frame, [cv2.convexHull(leftEye)], -1, (0, 255, 0), 1, maxLevel=1)
+		cv2.drawContours(frame, [cv2.convexHull(rightEye)], -1, (0, 255, 0), 1, maxLevel=1)
 		# Threshold만큼 눈이 감기면 Blink로 간주
 		if ear < EYE_AR_THRESH:
 			COUNTER += 1
 
+			if COUNTER > 60:
+				cv2.putText(frame, "Dont Sleep", (whalf, hhalf), font, 1, (0, 0, 255), 2)
+				print("Dont Sleep")
 		else:
 			if COUNTER >= EYE_AR_CONSEC_FRAMES:
 				TOTAL += 1
+
 			COUNTER = 0
 
-		cv2.putText(frame, "Blinks: {}".format(TOTAL), (10, 30),
-    		cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-		cv2.putText(frame, "EAR: {:.2f}".format(ear), (300, 30),
-    		cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+		cv2.putText(frame, "Blinks: {}".format(TOTAL), (10, 30), font, 0.7, (0, 0, 255), 2)
+		cv2.putText(frame, "EAR: {:.2f}".format(ear), (300, 30), font, 0.7, (0, 0, 255), 2)
 
 	cv2.imshow("Frame", frame)
 	if cv2.waitKey(1) & 0xFF == ord("q"):
 		break
 
-cv2.release()
+cap.release()
+cap.stop()
 cv2.destroyAllWindows()
